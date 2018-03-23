@@ -20,18 +20,19 @@ int allocation[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 /* the remaining need of each customer */
 int need[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 
-
-void *customer_entry_point(void *customer_num);
-//customer function prototypes: retursn 0 if success else -1
+//customer functions
+void *customer_entry_point(void*);
 int request_resources(int customer_num, int* request);
-int release_resources(int customer_num, int* release);
+int release_resources(int);
 int has_need(int cust_id);
+int is_safe();
 
-//mutexes for synchronisation across threads
-pthread_mutex_t *l_available;
-pthread_mutex_t *l_maximum; 
-pthread_mutex_t *l_allocation;
-pthread_mutex_t *l_need;
+//helper functions
+int has_need(int cust_id); //if need==0 for cust_id
+int is_leq(int*a, int*b);  //if a[]<=b[] 
+
+//mutex for synchronisation across threads
+pthread_mutex_t l_available;
 
 int main(int argc, char**argv){
 
@@ -52,18 +53,9 @@ int main(int argc, char**argv){
 	//populate resources into available
 	for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
 		available[i]=atoi(argv[i+1]);
-
-	l_need = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	l_allocation = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	l_maximum = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	l_available = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-	pthread_mutex_init(&l_available[0],NULL);
-	pthread_mutex_init(&l_allocation[0],NULL);
-	pthread_mutex_init(&l_need[0],NULL);
-	pthread_mutex_init(&l_maximum[0],NULL);
-
+	pthread_mutex_init(&l_available,NULL);
 	pthread_t* customers = (pthread_t*)malloc(sizeof(pthread_t)*NUMBER_OF_CUSTOMERS);
-
+	//start customer threads
 	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++)
 	{
 		int *id = (int*)malloc(sizeof(int));
@@ -71,11 +63,29 @@ int main(int argc, char**argv){
 		pthread_create(&customers[i],NULL,customer_entry_point,(void*)id);
 	}
 
-	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++){
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++)
 		pthread_join(customers[i],NULL);
-	}
 
 	return 0;
+}
+/*
+int* work = (int*)malloc(sizeof(int)*NUMBER_OF_RESOURCES);
+	int* finish = (int*)malloc(sizeof(int)*NUMBER_OF_CUSTOMERS);
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++) 
+		finish[i]=0;
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++)
+	{
+		if(finish[i]==0 && is_leq(need[i],work)){
+			for (int j = 0; i < NUMBER_OF_RESOURCES; i++)
+
+		}
+	}
+	free(work);
+	free(finish);
+	return 0;*/
+
+int is_safe(){
+	
 }
 int has_need(int cust_id){
 	int counter =0;
@@ -86,16 +96,46 @@ int has_need(int cust_id){
 }
 
 //is less than equal 
-int is_leq(){
+int is_leq(int *a, int *b){
+	for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
+		if (a[i]>b[i]) return 0;
+	return 1;
+}
+
+int request_resources(int cust_id, int* request){
+	pthread_mutex_lock(&l_available);
+	if (!is_leq(request,need[cust_id])) return -1;
+	if(!is_leq(request,available)) return -1;
+	//resource request algorithm passed
+	for (int i = 0; i < NUMBER_OF_RESOURCES; i++){
+		available[i]-= request[i];
+		allocation[cust_id][i] += request[i];
+		need[cust_id][i]-= request[i];
+	}
+	if(is_safe()){
+		pthread_mutex_unlock(&l_available);
+		return 0;
+	} 
+	else{
+		for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
+		{
+			available[i]+= request[i];
+			allocation[cust_id][i] -= request[i];
+			need[cust_id][i]+= request[i];
+		}
+	pthread_mutex_unlock(&l_available);
+	return -1;
+	}
+}
+
+int release_resources(int cust_id){
+	pthread_mutex_lock(&l_available);
+	for (int i = 0; i < NUMBER_OF_RESOURCES; i++){
+		available[i]+=allocation[cust_id][i];		
+		allocation[cust_id][i]=0;
+	}
+	pthread_mutex_unlock(&l_available);
 	return 0;
-}
-
-int request_resources(int customer_num, int* request){
-	return -1;
-}
-
-int release_resources(int customer_num, int* release){
-	return -1;
 }
 
 void *customer_entry_point(void *customer_num){
@@ -108,7 +148,8 @@ void *customer_entry_point(void *customer_num){
 		//populate need and max
 		for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
 		{
-			int temp=(rand())%(available[i]+1);  //upto max resource requestable
+			 //upto max resource requestable
+			int temp=(rand())%(available[i]+1); 
 			need[cust_id][i]= temp;
 			maximum[cust_id][i] = temp;
 			printf("%d\n",available[i] );
@@ -116,21 +157,23 @@ void *customer_entry_point(void *customer_num){
 		
 		//while need is >0, keep requesting randomly
 		int *request = (int*)malloc(sizeof(int)*NUMBER_OF_RESOURCES);
+		int granted;
 		while(has_need(cust_id)){
 			//generate random request
 			for (int i = 0; i <NUMBER_OF_RESOURCES; i++)
 				request[i]= rand()%(need[cust_id][i]+1);
-			int granted = -1;
+			granted = -1;
 			while(granted==-1){
 				granted =request_resources(cust_id,request);
 				//sleep if request is denied
 				if (granted==-1) usleep(rand()%11);
 				//request fulfilled
-				else if(granted==0 && has_need(cust_id)) ;  
+				else if(granted==0 && has_need(cust_id)) usleep(rand()%11);  
 			}
 		}
-
-	
+		free(request);
+		//need fulfilled
+		usleep(rand()%100);
+		release_resources(cust_id);	
 	}
-
 }
