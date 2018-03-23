@@ -18,14 +18,27 @@ int allocation[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 int need[NUMBER_OF_CUSTOMERS][NUMBER_OF_RESOURCES];
 
 
-//customer function prototypes: return 0 if success -1 if failure
+
+void *customer_entry_point(void *customer_num);
+//customer function prototypes: return 0 if suc
+
+void *customer_entry_point(void *customer_num){
+	//generate max
+	
+	return 0;
+}cess -1 if failure
 int request_resources(int customer_num, int request[]);
 int release_resources(int customer_num, int release[]);
 
+//mutexes for synchronisation across threads
+pthread_mutex_t *l_available;
+pthread_mutex_t *l_maximum; 
+pthread_mutex_t *l_allocation;
+pthread_mutex_t *l_need;
 
 int main(int argc, char**argv){
 
-	//handle resource instance input
+	//validate resource instance user input
 	if (argc-1!=NUMBER_OF_RESOURCES){
 		printf("Invalid Number of Resources!! make sure %d resources\n",NUMBER_OF_RESOURCES);
 		return -1;
@@ -39,9 +52,36 @@ int main(int argc, char**argv){
 			}
 		}
 	}
+	//populate resources into available
+	for (int i = 1; i < NUMBER_OF_RESOURCES; ++i)
+	{
+		available[i]=atoi(argv[i]);
+	}
+	l_need = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	l_allocation = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	l_maximum = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	l_available = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+	pthread_mutex_init(&l_available[0],NULL);
+	pthread_mutex_init(&l_allocation[0],NULL);
+	pthread_mutex_init(&l_need[0],NULL);
+	pthread_mutex_init(&l_maximum[0],NULL);
 
-	pthread_t* customers = (pthread_t*)malloc(sizeof(pthread_t));
-	
+	pthread_t* customers = (pthread_t*)malloc(sizeof(pthread_t)*NUMBER_OF_CUSTOMERS);
+
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; ++i)
+	{
+		pthread_create(&customers[i],NULL,customer_entry_point,(void*)&i);
+	}
+
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; ++i){
+		pthread_join(customers[i],NULL);
+	}
+
+	return 0;
+}
+
+void *customer_entry_point(void *customer_num){
+	//generate max
 	
 	return 0;
 }
