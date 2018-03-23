@@ -85,7 +85,39 @@ int* work = (int*)malloc(sizeof(int)*NUMBER_OF_RESOURCES);
 	return 0;*/
 
 int is_safe(){
-	
+	//since only thread with lock can enter here, no race conditions occur
+	int* work = (int*)malloc(sizeof(int)*NUMBER_OF_RESOURCES);
+	int* finish = (int*)malloc(sizeof(int)*NUMBER_OF_CUSTOMERS);
+	int done;
+	//initialise work to available
+	for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
+		work[i]=available[i];
+	//initialise finish to false
+	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++)
+		finish[i] = 0;
+	int count = 0;
+	do{
+		//find index for which need <= work and finish[i] == false
+		for (int i = 0; i <NUMBER_OF_CUSTOMERS; i++)
+		{
+			if (finish[i]==0 && is_leq(need[i],work)){
+				for (int j = 0; j < NUMBER_OF_RESOURCES; j++)
+					work[j]+= allocation[i][j];
+				finish[i]=1;
+			}else{
+				done=0;
+				for (int j = 0; i < NUMBER_OF_CUSTOMERS; j++)
+					done+=finish[j];
+				if (done==NUMBER_OF_CUSTOMERS) return 1; 
+			}
+		}
+		count++;
+	}while(count<NUMBER_OF_CUSTOMERS);
+
+	free(work);
+	free(finish);
+	return 0;
+
 }
 int has_need(int cust_id){
 	int counter =0;
