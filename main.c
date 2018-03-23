@@ -35,7 +35,6 @@ int is_leq(int*a, int*b);  //if a[]<=b[]
 pthread_mutex_t l_available;
 
 int main(int argc, char**argv){
-
 	//validate resource instance user input
 	if (argc-1!=NUMBER_OF_RESOURCES){
 		printf("Invalid Number of Resources!! make sure %d resources\n",NUMBER_OF_RESOURCES);
@@ -68,21 +67,6 @@ int main(int argc, char**argv){
 
 	return 0;
 }
-/*
-int* work = (int*)malloc(sizeof(int)*NUMBER_OF_RESOURCES);
-	int* finish = (int*)malloc(sizeof(int)*NUMBER_OF_CUSTOMERS);
-	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++) 
-		finish[i]=0;
-	for (int i = 0; i < NUMBER_OF_CUSTOMERS; i++)
-	{
-		if(finish[i]==0 && is_leq(need[i],work)){
-			for (int j = 0; i < NUMBER_OF_RESOURCES; i++)
-
-		}
-	}
-	free(work);
-	free(finish);
-	return 0;*/
 
 int is_safe(){
 	//since only thread with lock can enter here, no race conditions occur
@@ -106,7 +90,7 @@ int is_safe(){
 				finish[i]=1;
 			}else{
 				done=0;
-				for (int j = 0; i < NUMBER_OF_CUSTOMERS; j++)
+				for (int j = 0; j < NUMBER_OF_CUSTOMERS; j++)
 					done+=finish[j];
 				if (done==NUMBER_OF_CUSTOMERS) return 1; 
 			}
@@ -135,9 +119,18 @@ int is_leq(int *a, int *b){
 }
 
 int request_resources(int cust_id, int* request){
+	//timestamp, customer id, # requested resource type 1, # requested resource type 2, ...
 	pthread_mutex_lock(&l_available);
-	if (!is_leq(request,need[cust_id])) return -1;
-	if(!is_leq(request,available)) return -1;
+	printf(" %lu, %d, ",time(NULL),cust_id);
+	for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
+		printf(" %d requested resource type %d ",request[i],i);
+	printf("\n");
+	if (!is_leq(request,need[cust_id])||!is_leq(request,available)){
+		printf(" %lu, %d, request denied\n",time(NULL),cust_id);
+		pthread_mutex_unlock(&l_available);
+		return -1;
+	} 
+	
 	//resource request algorithm passed
 	for (int i = 0; i < NUMBER_OF_RESOURCES; i++){
 		available[i]-= request[i];
@@ -145,6 +138,8 @@ int request_resources(int cust_id, int* request){
 		need[cust_id][i]-= request[i];
 	}
 	if(is_safe()){
+		//timestamp, customer id, request satisfied (or request denied)
+		printf(" %lu, %d, request satisfied\n",time(NULL),cust_id);
 		pthread_mutex_unlock(&l_available);
 		return 0;
 	} 
@@ -155,6 +150,7 @@ int request_resources(int cust_id, int* request){
 			allocation[cust_id][i] -= request[i];
 			need[cust_id][i]+= request[i];
 		}
+	printf(" %lu, %d, request denied\n",time(NULL),cust_id);
 	pthread_mutex_unlock(&l_available);
 	return -1;
 	}
@@ -166,6 +162,8 @@ int release_resources(int cust_id){
 		available[i]+=allocation[cust_id][i];		
 		allocation[cust_id][i]=0;
 	}
+	//timestamp, customer id, resource released
+	printf(" %lu, %d, resource released\n",time(NULL),cust_id);
 	pthread_mutex_unlock(&l_available);
 	return 0;
 }
@@ -181,10 +179,9 @@ void *customer_entry_point(void *customer_num){
 		for (int i = 0; i < NUMBER_OF_RESOURCES; i++)
 		{
 			 //upto max resource requestable
-			int temp=(rand())%(available[i]+1); 
+			int temp=(rand())%(available[i]+1);
 			need[cust_id][i]= temp;
 			maximum[cust_id][i] = temp;
-			printf("%d\n",available[i] );
 		}
 		
 		//while need is >0, keep requesting randomly
@@ -199,7 +196,7 @@ void *customer_entry_point(void *customer_num){
 				granted =request_resources(cust_id,request);
 				//sleep if request is denied
 				if (granted==-1) usleep(rand()%11);
-				//request fulfilled
+				//request fulfilled but has need
 				else if(granted==0 && has_need(cust_id)) usleep(rand()%11);  
 			}
 		}
