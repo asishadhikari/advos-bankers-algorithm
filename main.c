@@ -195,14 +195,14 @@ void *customer_entry_point(void *customer_num){
 			while(granted==-1){
 				granted =request_resources(cust_id,request);
 				//sleep if request is denied
-				if (granted==-1) usleep(rand()%11);
+				if (granted==-1) sleep(rand()%11);
 				//request fulfilled but has need
-				else if(granted==0 && has_need(cust_id)) usleep(rand()%11);  
+				else if(granted==0 && has_need(cust_id)) sleep(rand()%11);  
 			}
 		}
 		free(request);
 		//need fulfilled
-		usleep(rand()%100);
+		sleep(rand()%100);
 		release_resources(cust_id);	
 	}
 }
